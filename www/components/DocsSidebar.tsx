@@ -1,55 +1,45 @@
-import {
-  CATEGORIES,
+import type {
   TableOfContentsCategory,
   TableOfContentsCategoryEntry,
 } from "../data/docs.ts";
 
-export default function DocsSidebar(props: { path: string }) {
-  return (
-    <ol class="list-decimal list-inside font-semibold nested">
-      {CATEGORIES.map((category) => (
-        <SidebarCategory path={props.path} category={category} />
-      ))}
-    </ol>
-  );
-}
-
-const link = "text(gray-900 hover:gray-600)";
-const linkActive = "text(green-600 hover:green-500)";
-
 export function SidebarCategory(props: {
-  path: string;
   category: TableOfContentsCategory;
 }) {
   const { title, href, entries } = props.category;
 
-  const outerLink = `${href == props.path ? linkActive : link} font-bold`;
-
   return (
     <li class="my-2 block">
-      <a href={href} class={outerLink}>{title}</a>
+      <a
+        href={href}
+        class="text-gray-900 hover:text-gray-600 aria-[current]:text-green-700 aria-[current]:hover:underline font-bold"
+      >
+        {title}
+      </a>
       {entries.length > 0 && (
-        <ol class="pl-4 list-decimal nested">
+        <ul class="py-2 nested list-outside">
           {entries.map((entry) => (
-            <SidebarEntry path={props.path} entry={entry} />
+            <SidebarEntry key={entry.href} entry={entry} />
           ))}
-        </ol>
+        </ul>
       )}
     </li>
   );
 }
 
 export function SidebarEntry(props: {
-  path: string;
   entry: TableOfContentsCategoryEntry;
 }) {
   const { title, href } = props.entry;
 
-  const innerLink = `${href == props.path ? linkActive : link} font-normal`;
-
   return (
-    <li class="my-0.5">
-      <a href={href} class={innerLink}>{title}</a>
+    <li class="py-[1px]">
+      <a
+        href={href}
+        class="aria-[current]:text-green-700 aria-[current]:border-green-600 aria-[current]:bg-green-50 border-l-4 border-transparent px-4 py-0.5 transition-colors hover:text-green-500 font-normal block"
+      >
+        {title}
+      </a>
     </li>
   );
 }

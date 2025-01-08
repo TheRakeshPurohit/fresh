@@ -1,8 +1,9 @@
-[Documentation](#-documentation) | [Getting started](#-getting-started)
+[Documentation](#-documentation) | [Getting started](#-getting-started) |
+[API Reference](https://deno.land/x/fresh?doc)
 
 # fresh
 
-<img align="right" src="https://fresh.deno.dev/logo.svg" height="150px" alt="the fresh logo: a sliced lemon dripping with juice">
+<img align="right" src="https://fresh.deno.dev/logo.svg" height="150px" alt="The Fresh logo: a sliced lemon dripping with juice">
 
 **Fresh** is a next generation web framework, built for speed, reliability, and
 simplicity.
@@ -12,25 +13,24 @@ Some stand-out features:
 - Just-in-time rendering on the edge.
 - Island based client hydration for maximum interactivity.
 - Zero runtime overhead: no JS is shipped to the client by default.
-- No build step.
 - No configuration necessary.
 - TypeScript support out of the box.
 - File-system routing à la Next.js.
 
 ## 📖 Documentation
 
-The [documentation](https://fresh.deno.dev/docs/) is available on
+The [documentation](https://fresh.deno.dev/docs/introduction) is available on
 [fresh.deno.dev](https://fresh.deno.dev/).
 
 ## 🚀 Getting started
 
-Install [Deno CLI](https://deno.land/) version 1.25.0 or higher.
+Install the latest [Deno CLI](https://deno.land/) version.
 
 You can scaffold a new project by running the Fresh init script. To scaffold a
-project in the `deno-fresh-demo` folder, run the following:
+project run the following:
 
 ```sh
-deno run -A -r https://fresh.deno.dev deno-fresh-demo
+deno run -A -r https://fresh.deno.dev
 ```
 
 Then navigate to the newly created project folder:
@@ -62,9 +62,14 @@ For a more in-depth getting started guide, visit the
 [Getting Started](https://fresh.deno.dev/docs/getting-started) page in the Fresh
 docs.
 
+## Contributing
+
+We appreciate your help! To contribute, please read our
+[contributing instructions](https://deno.com/manual/references/contributing#submitting-a-pr-to-fresh).
+
 ## Adding your project to the showcase
 
-If you feel that your project would be helpful to other fresh users, please
+If you feel that your project would be helpful to other Fresh users, please
 consider putting your project on the
 [showcase](https://fresh.deno.dev/showcase). However, websites that are just for
 promotional purposes may not be listed.
@@ -89,7 +94,12 @@ preferably with source code on GitHub, but not required.
 
 ```html
 <a href="https://fresh.deno.dev">
-   <img width="197" height="37" src="https://fresh.deno.dev/fresh-badge.svg" alt="Made with Fresh" />
+  <img
+    width="197"
+    height="37"
+    src="https://fresh.deno.dev/fresh-badge.svg"
+    alt="Made with Fresh"
+  />
 </a>
 ```
 
@@ -101,6 +111,23 @@ preferably with source code on GitHub, but not required.
 
 ```html
 <a href="https://fresh.deno.dev">
-   <img width="197" height="37" src="https://fresh.deno.dev/fresh-badge-dark.svg" alt="Made with Fresh" />
+  <img
+    width="197"
+    height="37"
+    src="https://fresh.deno.dev/fresh-badge-dark.svg"
+    alt="Made with Fresh"
+  />
 </a>
 ```
+
+## Hashtags
+
+Use the following hashtags in your social media posts that reference Fresh and
+as Topics in the About section of your GitHub repos that contain Fresh code. It
+will assure maximum visibility for your posts and code, and promote Fresh
+development ecosystem visibility.
+
+- #denofresh
+- #deno
+
+Github repo Topics will not include the hash symbol.
