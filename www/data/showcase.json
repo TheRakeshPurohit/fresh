@@ -485,5 +485,11 @@
     "link": "https://boxdgrid.deno.dev",
     "github": "wfrancescons/boxdgrid",
     "image": "boxdgrid"
+  },
+  {
+    "title": "Left Of Life",
+    "link": "https://leftof.life",
+    "github": "j0si/howmuchlife",
+    "image": "left-of-life"
   }
 ]
