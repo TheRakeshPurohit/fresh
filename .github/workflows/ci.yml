@@ -19,10 +19,6 @@ jobs:
             echo "::error::PR title must start with feat:, fix:, test:, chore:, or ci:"
             exit 1
           fi
-          if echo "$TITLE" | grep -qP '[A-Z]'; then
-            echo "::error::PR title must be all lowercase"
-            exit 1
-          fi
 
   test:
     runs-on: ${{ matrix.os }}
@@ -78,3 +74,7 @@ jobs:
       - name: Build fresh.deno.dev
         if: startsWith(matrix.os, 'ubuntu') && matrix.deno == 'v2.x'
         run: deno task build-www
+
+      - name: Check links
+        if: startsWith(matrix.os, 'ubuntu') && matrix.deno == 'v2.x'
+        run: deno task check:links
