@@ -82,6 +82,26 @@ export class RenderState {
   renderedHtmlBody = false;
   renderedHtmlHead = false;
   hasRuntimeScript = false;
+  /** Set to true when any element in the tree renders f-client-nav="true". */
+  clientNavEnabled = false;
+
+  /**
+   * True when the page needs Fresh's client runtime (islands, client nav, or
+   * `<Partial>` regions on a full document). Partial subresponses omit boot;
+   * `encounteredPartials` must not force runtime for those requests.
+   */
+  get needsClientRuntime(): boolean {
+    if (this.islands.size > 0 || this.clientNavEnabled) {
+      return true;
+    }
+    if (
+      !this.ctx.url.searchParams.has(PARTIAL_SEARCH_PARAM) &&
+      this.encounteredPartials.size > 0
+    ) {
+      return true;
+    }
+    return false;
+  }
 
   constructor(
     // deno-lint-ignore no-explicit-any
@@ -419,6 +439,22 @@ options[OptionsType.DIFF] = (vnode) => {
           break;
       }
 
+      // Detect f-client-nav="true" on any element in the rendered tree.
+      // We check here in the diff hook (not the vnode hook) so we catch both
+      // VNodes created inside component functions during rendering AND those
+      // pre-created in route handlers before setRenderState was called.
+      //
+      // The === "true" check relies on the vnode hook having normalized boolean
+      // f-client-nav on string elements via String(...) (see OptionsType.VNODE).
+      // Preact invokes the vnode hook before diff for a given VNode, so e.g.
+      // <html f-client-nav> becomes the string "true" before we run here.
+      if (
+        CLIENT_NAV_ATTR in (vnode.props as Record<string, unknown>) &&
+        (vnode.props as Record<string, unknown>)[CLIENT_NAV_ATTR] === "true"
+      ) {
+        RENDER_STATE!.clientNavEnabled = true;
+      }
+
       if (
         vnode.key !== undefined &&
         (RENDER_STATE!.partialDepth > 0 || hasIslandOwner(RENDER_STATE!, vnode))
@@ -623,6 +659,9 @@ function FreshRuntimeScript() {
 
   const islandArr = Array.from(islands);
 
+  // Partial responses only embed __FRSH_STATE__ JSON for the swapped fragment.
+  // We do not gate on needsClientRuntime: the parent full-document response is
+  // responsible for loading the client boot when islands or client nav require it.
   if (ctx.url.searchParams.has(PARTIAL_SEARCH_PARAM)) {
     const islands = islandArr.map((island) => {
       return {
@@ -647,7 +686,12 @@ function FreshRuntimeScript() {
         },
       })
     );
-  } else {
+  } else if (
+    RENDER_STATE!.needsClientRuntime ||
+    buildCache.hmrClientEntry !== undefined
+  ) {
+    // Full-document boot: islands / partials / client nav, or Vite/HMR dev
+    // (client entry must load so e.g. CSS side-effect imports run).
     const islandImports = islandArr.map((island) => {
       const named = island.exportName === "default"
         ? island.name
@@ -689,6 +733,9 @@ function FreshRuntimeScript() {
       )
     );
   }
+
+  // Production static page: no client JS at all.
+  return buildCache.features.errorOverlay ? h(ShowErrorOverlay, null) : null;
 }
 
 export function ShowErrorOverlay() {
