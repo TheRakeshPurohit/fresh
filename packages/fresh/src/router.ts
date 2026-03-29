@@ -116,9 +116,26 @@ export class UrlPatternRouter<T> implements Router<T> {
       pattern: null,
     };
 
-    const staticMatch = this.#statics.get(url.pathname);
+    let pathname = url.pathname;
+    let staticMatch = this.#statics.get(pathname);
+
+    // Try alternate trailing slash form if no exact match found.
+    // Routes may be registered with or without trailing slashes,
+    // and requests may arrive in either form (e.g. when using
+    // trailingSlashes("always")).
+    if (staticMatch === undefined && pathname !== "/") {
+      const alt = pathname.endsWith("/")
+        ? pathname.slice(0, -1)
+        : pathname + "/";
+      const altMatch = this.#statics.get(alt);
+      if (altMatch !== undefined) {
+        staticMatch = altMatch;
+        pathname = alt;
+      }
+    }
+
     if (staticMatch !== undefined) {
-      result.pattern = url.pathname;
+      result.pattern = pathname;
 
       let handlers = staticMatch.byMethod[method];
       if (method === "HEAD" && handlers.length === 0) {
