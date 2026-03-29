@@ -1859,6 +1859,49 @@ Deno.test({
 });
 
 Deno.test({
+  name: "partials - form without action inside f-client-nav not intercepted",
+  fn: async () => {
+    const app = testApp()
+      .post("/", (ctx) => {
+        return ctx.render(
+          <Doc>
+            <p class="submitted">form submitted normally</p>
+          </Doc>,
+        );
+      })
+      .get("/", (ctx) => {
+        return ctx.render(
+          <Doc>
+            <div f-client-nav>
+              <form method="post">
+                <input name="name" value="foo" />
+                <Partial name="foo">
+                  <p class="init">init</p>
+                </Partial>
+                <button type="submit" class="update">
+                  update
+                </button>
+              </form>
+            </div>
+          </Doc>,
+        );
+      });
+
+    await withBrowserApp(app, async (page, address) => {
+      await page.goto(address, { waitUntil: "load" });
+      await page.locator(".init").wait();
+
+      // Form should do a full page navigation, not a partial update
+      await Promise.all([
+        page.waitForNavigation(),
+        page.locator(".update").click(),
+      ]);
+      await page.locator(".submitted").wait();
+    });
+  },
+});
+
+Deno.test({
   name: "partials - submit form redirect",
   fn: async () => {
     const app = testApp()
