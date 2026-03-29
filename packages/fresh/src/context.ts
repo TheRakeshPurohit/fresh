@@ -73,7 +73,7 @@ export class Context<State> {
    */
   readonly url: URL;
   /** The original incoming {@linkcode Request} object. */
-  readonly req: Request;
+  req: Request;
   /** The matched route pattern. */
   readonly route: string | null;
   /** The url parameters of the matched route pattern. */
