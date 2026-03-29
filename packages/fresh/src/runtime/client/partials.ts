@@ -306,11 +306,21 @@ async function fetchPartials(
     }
   }
 
+  try {
+    await applyPartials(res);
+  } catch (err) {
+    // When a redirect leads to a page without partials, fall back
+    // to a full page navigation instead of silently failing.
+    if (err instanceof NoPartialsError && res.redirected) {
+      location.href = actualUrl.href;
+      return;
+    }
+    throw err;
+  }
+
   if (shouldNavigate) {
     maybeUpdateHistory(actualUrl);
   }
-
-  await applyPartials(res);
 }
 
 interface PartialReviveCtx {
