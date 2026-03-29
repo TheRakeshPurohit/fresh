@@ -411,7 +411,33 @@ export async function applyPartials(res: Response): Promise<void> {
     } else if (child.nodeName === "SCRIPT") {
       const script = child as HTMLScriptElement;
       if (script.src === `${INTERNAL_PREFIX}/fresh-runtime.js`) return;
-      // TODO: What to do with script tags?
+
+      // Append data scripts (e.g. application/ld+json for SEO structured
+      // data) to the document head. Skip executable script types to
+      // avoid unintended re-execution.
+      const t = script.type;
+      if (
+        t !== "" && t !== "module" && t !== "text/javascript" &&
+        t !== "importmap"
+      ) {
+        // Deduplicate: replace existing data script with same type and
+        // id, or same type and content, to avoid accumulating duplicates
+        // across repeated partial navigations.
+        const selector = script.id
+          ? `script[type="${t}"][id="${script.id}"]`
+          : `script[type="${t}"]`;
+        const existing = Array.from(
+          document.head.querySelectorAll<HTMLScriptElement>(selector),
+        ).find((el) =>
+          script.id ? true : el.textContent === script.textContent
+        );
+
+        if (existing === undefined) {
+          document.head.appendChild(script);
+        } else if (existing.textContent !== script.textContent) {
+          existing.textContent = script.textContent;
+        }
+      }
     } else if (child.nodeName === "STYLE") {
       const style = child as HTMLStyleElement;
       // TODO: Do we need a smarter merging strategy?
