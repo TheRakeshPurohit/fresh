@@ -9,7 +9,7 @@ import {
 import * as path from "@std/path";
 import * as babel from "@babel/core";
 import { httpAbsolute } from "./patches/http_absolute.ts";
-import { JSX_REG } from "../utils.ts";
+import { JS_REG, JSX_REG } from "../utils.ts";
 import { builtinModules } from "node:module";
 
 // @ts-ignore Workaround for https://github.com/denoland/deno/issues/30850
@@ -17,42 +17,15 @@ const { default: babelReact } = await import("@babel/preset-react");
 
 const BUILTINS = new Set(builtinModules);
 
+interface DenoState {
+  type: RequestedModuleType;
+}
+
 export function deno(): Plugin {
   let ssrLoader: Loader;
   let browserLoader: Loader;
 
   let isDev = false;
-
-  // Cache for package.json "type" field lookups. Per Node.js semantics,
-  // .js files in node_modules are CJS unless the nearest package.json
-  // has "type": "module".
-  const pkgTypeCache = new Map<string, boolean>();
-  async function isEsmPackage(filePath: string): Promise<boolean> {
-    let dir = path.dirname(filePath);
-    while (true) {
-      const cached = pkgTypeCache.get(dir);
-      if (cached !== undefined) return cached;
-
-      try {
-        const text = await Deno.readTextFile(path.join(dir, "package.json"));
-        const isEsm = JSON.parse(text).type === "module";
-        pkgTypeCache.set(dir, isEsm);
-        return isEsm;
-      } catch {
-        const parent = path.dirname(dir);
-        if (parent === dir) break;
-        dir = parent;
-      }
-    }
-    return false;
-  }
-
-  // Detect actual ESM export/import statements at the statement level.
-  // More robust than code.includes("export ") which matches comments
-  // and strings (e.g. "// Remove export in next version" would trick it).
-  // Handles both formatted and minified ESM (e.g. "import{" with no space).
-  const ESM_STMT_RE =
-    /(?:^|[\n;])\s*(?:export\s*[{*]|export\s+(?:default|const|let|var|function|class|async)\b|import\s*[{*"']|import\s+[a-zA-Z_$])/;
 
   return {
     name: "deno",
@@ -110,21 +83,6 @@ export function deno(): Plugin {
       if (id.startsWith("/") && importer && /^https?:\/\//g.test(importer)) {
         const url = new URL(importer);
         id = `${url.origin}${id}`;
-      }
-
-      // Apply resolve.alias before Deno resolution so that
-      // react -> preact/compat works even in externalized packages.
-      // Vite normalizes alias config to { find, replacement }[] format.
-      const aliases = this.environment?.config?.resolve?.alias;
-      if (aliases) {
-        const list = Array.isArray(aliases) ? aliases : [];
-        for (const alias of list) {
-          const find = alias.find;
-          if (typeof find === "string" ? find === id : find?.test?.(id)) {
-            id = typeof alias.replacement === "string" ? alias.replacement : id;
-            break;
-          }
-        }
       }
 
       // We still want to allow other plugins to participate in
@@ -197,13 +155,14 @@ export function deno(): Plugin {
           resolved = path.fromFileUrl(resolved);
         }
 
-        // For file:// resolved modules (npm packages in node_modules,
-        // local files), let Vite handle loading natively. This allows
-        // Vite to externalize CJS packages in SSR mode (Node.js handles
-        // them with native require()) and avoids needing a custom CJS
-        // transform. Only \0deno:: virtual modules (jsr:, non-default
-        // types) need Fresh's custom load hook.
-        return { id: resolved };
+        return {
+          id: resolved,
+          meta: {
+            deno: {
+              type,
+            },
+          },
+        };
       } catch {
         // ignore
       }
@@ -212,87 +171,6 @@ export function deno(): Plugin {
       const loader = this.environment.config.consumer === "server"
         ? ssrLoader
         : browserLoader;
-
-      // In dev mode, CJS files need to be wrapped in an ESM shim:
-      // - SSR: module runner evaluates as ESM, needs module/exports/require
-      // - Client: browser evaluates as ESM, needs module/exports
-      // In build mode, Rollup's @rollup/plugin-commonjs handles CJS.
-      //
-      // CJS detection uses Node.js semantics (package.json "type" field)
-      // instead of content heuristics, which can be fooled by comments
-      // or strings containing "export"/"import".
-      if (
-        isDev &&
-        !id.startsWith("\0") &&
-        id.includes("node_modules") &&
-        /\.(c?js|cjs)$/.test(id)
-      ) {
-        // .cjs is always CJS. For .js files, check the nearest
-        // package.json "type" field first (Node.js semantics), then
-        // fall back to content-based detection for dual CJS/ESM
-        // packages that ship ESM in .js without "type": "module".
-        if (id.endsWith(".cjs") || !(await isEsmPackage(id))) {
-          try {
-            const code = await Deno.readTextFile(id);
-
-            // Skip if the file contains actual ESM syntax. Some packages
-            // (e.g. @opentelemetry/api) ship both CJS and ESM as .js
-            // without "type": "module" in package.json.
-            if (!ESM_STMT_RE.test(code)) {
-              const isServer = this.environment.config.consumer === "server";
-
-              if (isServer) {
-                // SSR: use Node.js createRequire for full CJS compat
-                const wrapped = `
-import { createRequire as __cjs_createRequire } from "node:module";
-import { fileURLToPath as __cjs_fileURLToPath } from "node:url";
-import { dirname as __cjs_dirname } from "node:path";
-var __filename = __cjs_fileURLToPath(import.meta.url);
-var __dirname = __cjs_dirname(__filename);
-var require = __cjs_createRequire(import.meta.url);
-var module = { exports: {} };
-var exports = module.exports;
-
-${code}
-
-export default module.exports;
-`;
-                return { code: wrapped };
-              }
-
-              // Client: convert require() calls to ESM imports so
-              // browsers can load them. Hoist static require() calls
-              // to import statements at the top.
-              const imports: string[] = [];
-              let idx = 0;
-              const transformed = code.replace(
-                /\brequire\(["']([^"']+)["']\)/g,
-                (_match: string, spec: string) => {
-                  const varName = `__cjs_import_${idx++}`;
-                  imports.push(
-                    `import ${varName} from ${JSON.stringify(spec)};`,
-                  );
-                  return `(${varName}.default ?? ${varName})`;
-                },
-              );
-
-              const wrapped = `${imports.join("\n")}
-var module = { exports: {} };
-var exports = module.exports;
-var __filename = "";
-var __dirname = "";
-
-${transformed}
-
-export default module.exports;
-`;
-              return { code: wrapped };
-            }
-          } catch {
-            // Fall through to default loading
-          }
-        }
-      }
 
       if (isDenoSpecifier(id)) {
         const { type, specifier } = parseDenoSpecifier(id);
@@ -319,6 +197,49 @@ export default module.exports;
           code,
         };
       }
+
+      if (id.startsWith("\0")) {
+        id = id.slice(1);
+      }
+
+      const meta = this.getModuleInfo(id)?.meta.deno as
+        | DenoState
+        | undefined
+        | null;
+
+      if (meta === null || meta === undefined) return;
+
+      // Skip for non-js files like `.css`
+      if (
+        meta.type === RequestedModuleType.Default &&
+        !JS_REG.test(id)
+      ) {
+        return;
+      }
+
+      const url = path.toFileUrl(id);
+
+      const result = await loader.load(url.href, meta.type);
+      if (result.kind === "external") {
+        return null;
+      }
+
+      const code = new TextDecoder().decode(result.code);
+
+      const maybeJsx = babelTransform({
+        ssr: this.environment.config.consumer === "server",
+        media: result.mediaType,
+        id,
+        code,
+        isDev,
+      });
+      if (maybeJsx) {
+        return maybeJsx;
+      }
+
+      return {
+        code,
+      };
     },
     transform: {
       filter: {
